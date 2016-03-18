@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+# generic idea for snapshots. don't make separate snapshots for weekly/monthly because it's wasteful. we can use dailies.
+# keeps 7 dailies (one of the dailies will always land on a "weekly" spot)
+# keeps 4 weekly (29 day check should invalidate anything past 4 weeks)
+# keeps 3 monthly (90 day check should invalidate anything past 3 months)
+
+# day of the week to keep as weekly (shorthand)
+DAYOFWEEK="Sun"
+
+# day of the month to keep as monthly
+DAYOFMONTH="1"
+
+printf "%-16s %-9s %-9s %-7s\n" "Date" "Type" "Status" "Action"
+printf "%-16s %-9s %-9s %-7s\n" "---------------" "--------" "--------" "-------"
+
+SNAPSHOTS=`cat snaps.txt`
+
+# just need to parse out "$date" out of the snapshot, one way or another
+for date in $SNAPSHOTS; do
+
+  day=$(date -d $date +%d)
+  dayofweek=$(date -d $date +%a)
+  daysago=$((($(date -u +'%s') - $(date -ud $date +'%s'))/60/60/24))
+
+  if [ "$day" -eq "$DAYOFMONTH" ]; then
+    type="monthly"
+    if [ "$daysago" -gt "91" ]; then
+      status="stale"
+      action="delete"
+# TODO: aws ec2 snapshot delete 
+    else
+      status="active"
+      action="keep"
+    fi
+  elif [ "$dayofweek" = "$DAYOFWEEK" ]; then
+    type="weekly"
+    if [ "$daysago" -gt "29" ]; then
+      status="stale"
+      action="delete"
+# TODO: aws ec2 snapshot delete 
+    else
+      status="active"
+      action="keep"
+    fi
+  else
+    type="daily"
+    if [ "$daysago" -gt "8" ]; then
+      status="stale"
+      action="delete"
+# TODO: aws ec2 snapshot delete 
+    else
+      status="active"
+      action="keep"
+    fi
+  fi
+  printf "%-10s %-5s %-9s %-9s %-7s\n" $date $dayofweek $type $status $action
+done
